@@ -47,7 +47,17 @@ export const CandidateForm: React.FC = () => {
       alert(`Đã thêm ứng viên ${data.full_name} thành công!`);
 
     } catch (error: any) {
-      alert(`Lỗi: ${error.message}`);
+      console.error('Error submitting candidate:', error);
+      const isUnauthorized = error.status === 401 || 
+                             error.message?.includes('Unauthorized') || 
+                             (error.context && error.context.status === 401);
+
+      if (isUnauthorized) {
+        await supabase.auth.signOut();
+        window.location.href = '/auth';
+      } else {
+        alert(`Lỗi: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }

@@ -4,6 +4,15 @@
 # working directory name when running `supabase init`.
 project_id = "candidates-mini-app"
 
+[functions.analytics]
+# Supabase publishable/secret keys (`sb_*`) are not JWTs. The platform's default Edge Function JWT
+# verification expects legacy JWT-based keys, and will return 401 {"message":"Invalid JWT"}.
+# We authenticate inside the function via Supabase Auth instead.
+verify_jwt = false
+
+[functions.add-candidate]
+verify_jwt = false
+
 [api]
 enabled = true
 # Port to use for the API URL.

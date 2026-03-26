@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 export const Auth: React.FC = () => {
@@ -8,6 +8,16 @@ export const Auth: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+
+  useEffect(() => {
+
+    const testConnection = async () => {
+      const { data, error } = await supabase.auth.getSession()
+      console.log('session:', data)
+      console.log('error:', error)
+    }
+    testConnection()
+  }, [])
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -37,11 +47,11 @@ export const Auth: React.FC = () => {
 
       <div className="glass max-w-md w-full space-y-8 p-10 rounded-[32px] animate-fade-in relative z-10 border border-white/10">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center p-3 mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary shadow-lg shadow-primary/20">
+          {/* <div className="inline-flex items-center justify-center p-3 mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary shadow-lg shadow-primary/20">
             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A10.003 10.003 0 0112 3a10.003 10.003 0 0112 10.003 10.003 0 01-10 10.003c-1.396 0-2.733-.242-3.987-.69m10.003-10.003l-.054.09" />
             </svg>
-          </div>
+          </div> */}
           <h2 className="text-4xl font-extrabold tracking-tight text-white mb-2">
             {isSignUp ? 'Join naming.' : 'Welcome back.'}
           </h2>
@@ -75,9 +85,8 @@ export const Auth: React.FC = () => {
           </div>
 
           {message && (
-            <div className={`text-sm p-4 rounded-2xl font-medium animate-fade-in ${
-              message.type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'
-            }`}>
+            <div className={`text-sm p-4 rounded-2xl font-medium animate-fade-in ${message.type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'
+              }`}>
               {message.text}
             </div>
           )}
