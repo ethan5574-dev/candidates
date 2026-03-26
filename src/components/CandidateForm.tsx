@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
+import { useToast } from '../context/useToast';
 
 export const CandidateForm: React.FC = () => {
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState('');
   const [position, setPosition] = useState('');
@@ -11,7 +13,7 @@ export const CandidateForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
-      alert('Vui lòng chọn file CV.');
+      showToast('Vui lòng chọn file CV.', 'error');
       return;
     }
 
@@ -28,15 +30,11 @@ export const CandidateForm: React.FC = () => {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('resumes')
-        .getPublicUrl(filePath);
-
       const { data, error: functionError } = await supabase.functions.invoke('add-candidate', {
         body: {
           full_name: fullName,
           applied_position: position,
-          resume_url: publicUrl,
+          resume_path: filePath,
         },
       });
 
@@ -45,19 +43,19 @@ export const CandidateForm: React.FC = () => {
       setFullName('');
       setPosition('');
       setFile(null);
-      alert(`Đã thêm ứng viên ${data.full_name} thành công!`);
+      showToast(`Đã thêm ứng viên ${data.full_name} thành công!`, 'success');
 
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error('Error submitting candidate:', error);
-      const isUnauthorized = error.status === 401 || 
-                             error.message?.includes('Unauthorized') || 
-                             (error.context && error.context.status === 401);
+      const err = error as { status?: number; message: string };
+      const isUnauthorized = err.status === 401 || 
+                             err.message?.includes('Unauthorized');
 
       if (isUnauthorized) {
         await supabase.auth.signOut();
         window.location.href = '/auth';
       } else {
-        alert(`Lỗi: ${error.message}`);
+        showToast(`Lỗi: ${err.message}`, 'error');
       }
     } finally {
       setLoading(false);

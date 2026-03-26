@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Candidate } from '../types';
-import { Search, MoreHorizontal, Star, Download, Eye, Briefcase } from 'lucide-react';
+import { Search, MoreHorizontal, Star, Download, Trash2, Briefcase } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Dropdown } from './common/Dropdown';
+import { useToast } from '../context/useToast';
 
 export const CandidateList: React.FC = () => {
+  const { showToast } = useToast();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,15 +38,45 @@ export const CandidateList: React.FC = () => {
         .eq('id', id);
         
       if (error) throw error;
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error('Error updating status:', error);
-      const isUnauthorized = error.status === 401 || 
-                             error.message?.includes('Unauthorized') || 
-                             (error.context && error.context.status === 401);
+      const err = error as { status?: number; message?: string };
+      const isUnauthorized = err.status === 401 || 
+                             err.message?.includes('Unauthorized');
       if (isUnauthorized) {
         await supabase.auth.signOut();
         window.location.href = '/auth';
       }
+    }
+  };
+
+  const handleDeleteCandidate = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this candidate?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('candidates')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    } catch (error: Error | unknown) {
+      console.error('Error deleting candidate:', error);
+    }
+  };
+
+  const handleDownloadResume = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('resumes')
+        .createSignedUrl(path, 60);
+      
+      if (error) throw error;
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
+    } catch (error: Error | unknown) {
+      console.error('Error getting signed URL:', error);
+      showToast('Could not retrieve CV. Please try again.', 'error');
     }
   };
 
@@ -53,11 +85,11 @@ export const CandidateList: React.FC = () => {
       const { data, error } = await supabase.from('candidates').select('*').order('created_at', { ascending: false });
       if (error) throw error;
       setCandidates(data || []);
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error('Error fetching candidates:', error);
-      const isUnauthorized = error.status === 401 || 
-                             error.message?.includes('Unauthorized') || 
-                             (error.context && error.context.status === 401);
+      const err = error as { status?: number; message?: string };
+      const isUnauthorized = err.status === 401 || 
+                             err.message?.includes('Unauthorized');
                              
       if (isUnauthorized) {
         await supabase.auth.signOut();
@@ -77,7 +109,7 @@ export const CandidateList: React.FC = () => {
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       // Implementation of "Matching Score" algorithm for Smart Sort
-      result = result.map(c => {
+      result = (result as (Candidate & { score: number })[]).map(c => {
         let score = 0;
         const nameChars = c.full_name.toLowerCase();
         const posChars = c.applied_position.toLowerCase();
@@ -99,8 +131,8 @@ export const CandidateList: React.FC = () => {
 
         return { ...c, score };
       })
-      .filter((c: any) => c.score > 0)
-      .sort((a: any, b: any) => b.score - a.score);
+      .filter(c => c.score > 0)
+      .sort((a, b) => b.score - a.score);
     }
 
     return result;
@@ -208,18 +240,21 @@ export const CandidateList: React.FC = () => {
                 </td>
                 <td className="px-8 py-5 text-right">
                   <div className="flex items-center justify-end gap-2 translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                    {c.resume_url && (
-                      <a 
-                        href={c.resume_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                    {c.resume_path && (
+                      <button 
+                        onClick={() => handleDownloadResume(c.resume_path!)}
                         className="p-2 hover:bg-white/10 rounded-lg text-text-secondary hover:text-white transition-all"
+                        title="View CV"
                       >
                         <Download className="w-4 h-4" />
-                      </a>
+                      </button>
                     )}
-                    <button className="p-2 hover:bg-white/10 rounded-lg text-text-secondary hover:text-white transition-all">
-                      <Eye className="w-4 h-4" />
+                    <button 
+                      onClick={() => handleDeleteCandidate(c.id)}
+                      className="p-2 hover:bg-red-500/10 rounded-lg text-text-secondary hover:text-red-400 transition-all"
+                      title="Delete Candidate"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                     <button className="p-2 hover:bg-white/10 rounded-lg text-text-secondary hover:text-white transition-all">
                       <MoreHorizontal className="w-4 h-4" />

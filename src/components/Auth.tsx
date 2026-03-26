@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
+import { useToast } from '../context/useToast';
 
 export const Auth: React.FC = () => {
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
 
   useEffect(() => {
@@ -22,19 +23,18 @@ export const Auth: React.FC = () => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setMessage(null);
-
     try {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setMessage({ type: 'success', text: 'Đăng ký thành công! Vui lòng kiểm tra email.' });
+        showToast('Đăng ký thành công! Vui lòng kiểm tra email.', 'success');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
+    } catch (error: Error | unknown) {
+      const err = error as { message: string };
+      showToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -90,12 +90,6 @@ export const Auth: React.FC = () => {
             </div>
           </div>
 
-          {message && (
-            <div className={`text-sm p-4 rounded-2xl font-medium animate-fade-in ${message.type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'
-              }`}>
-              {message.text}
-            </div>
-          )}
 
           <button
             type="submit"

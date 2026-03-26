@@ -9,7 +9,7 @@ const corsHeaders = {
 interface CandidateRequest {
   full_name: string;
   applied_position: string;
-  resume_url?: string;
+  resume_path?: string;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -32,7 +32,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const { full_name, applied_position, resume_url }: CandidateRequest = await req.json()
+    const { full_name, applied_position, resume_path }: CandidateRequest = await req.json()
 
     // Get user id from token
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
@@ -54,7 +54,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         user_id: user.id,
         full_name,
         applied_position,
-        resume_url,
+        resume_path,
         status: 'New'
       })
       .select()
@@ -66,8 +66,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: Error | unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMsg }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     })

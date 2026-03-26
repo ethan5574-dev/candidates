@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { AuthPage } from './pages/AuthPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { ToastProvider } from './context/ToastProvider'
 import './App.css'
 
 function App() {
@@ -37,20 +38,22 @@ function App() {
   }
 
   return (
-    <Routes>
-      <Route 
-        path="/auth" 
-        element={!session ? <AuthPage /> : <Navigate to="/dashboard" replace />} 
-      />
-      <Route 
-        path="/dashboard" 
-        element={session ? <DashboardPage session={session} /> : <Navigate to="/auth" replace />} 
-      />
-      <Route 
-        path="/" 
-        element={<Navigate to={session ? "/dashboard" : "/auth"} replace />} 
-      />
-    </Routes>
+    <ToastProvider>
+      <Routes>
+        <Route 
+          path="/auth" 
+          element={!session ? <AuthPage /> : <Navigate to="/dashboard" replace />} 
+        />
+        <Route 
+          path="/dashboard" 
+          element={session ? <DashboardPage session={session} /> : <Navigate to="/auth" replace />} 
+        />
+        <Route 
+          path="/" 
+          element={<Navigate to={session ? "/dashboard" : "/auth"} replace />} 
+        />
+      </Routes>
+    </ToastProvider>
   )
 }
 

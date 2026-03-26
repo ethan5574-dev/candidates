@@ -2,7 +2,7 @@ import { CandidateList } from '../components/CandidateList'
 import { CandidateForm } from '../components/CandidateForm'
 import { Analytics } from '../components/Analytics'
 import type { Session } from '@supabase/supabase-js'
-import { LayoutDashboard, Users, UserRound, PieChart, Briefcase, UserPlus, Settings, Bell, Search } from 'lucide-react'
+import { Users, Settings, Bell, Search } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { UserMenu } from '../components/common/UserMenu'
@@ -15,12 +15,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
   const [activeTab, setActiveTab] = useState('candidates');
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'candidates', label: 'Candidates', icon: Users },
-    { id: 'employees', label: 'Employees', icon: UserRound },
-    { id: 'analytics', label: 'Analytics', icon: PieChart },
-    { id: 'jobs', label: 'Jobs', icon: Briefcase },
-    { id: 'recruitment', label: 'Recruitment', icon: UserPlus },
+    { id: 'candidates', label: 'Candidate Management', icon: Users },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -99,8 +94,8 @@ export function DashboardPage({ session }: DashboardPageProps) {
             className="flex items-center justify-between"
           >
             <div>
-              <h2 className="text-3xl font-bold tracking-tight">Welcome back, Sarah! 👋</h2>
-              <p className="text-text-secondary mt-1 font-medium italic">HR Dashboard Overview</p>
+              <h2 className="text-3xl font-bold tracking-tight">Welcome, HR Professional! 👋</h2>
+              <p className="text-text-secondary mt-1 font-medium italic">Manage your talent pipeline with ease.</p>
             </div>
           </motion.div>
 

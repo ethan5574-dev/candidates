@@ -4,16 +4,7 @@ import type { AnalyticsStats } from '../types';
 import { ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area } from 'recharts';
 import { Users, UserCheck, Calendar, Briefcase } from 'lucide-react';
 
-// Mock data for the chart since the function only returns total counts
-const chartData = [
-  { name: 'Mon', count: 12 },
-  { name: 'Tue', count: 18 },
-  { name: 'Wed', count: 15 },
-  { name: 'Thu', count: 25 },
-  { name: 'Fri', count: 32 },
-  { name: 'Sat', count: 20 },
-  { name: 'Sun', count: 28 },
-];
+// Removed hardcoded chartData as we now fetch it from the Edge Function
 
 export const Analytics: React.FC = () => {
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
@@ -24,11 +15,11 @@ export const Analytics: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('analytics');
       if (error) throw error;
       setStats(data);
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error('Error fetching analytics:', error);
-      const isUnauthorized = error.status === 401 ||
-        error.message?.includes('Unauthorized') ||
-        (error.context && error.context.status === 401);
+      const err = error as { status?: number; message?: string };
+      const isUnauthorized = err.status === 401 ||
+        err.message?.includes('Unauthorized');
 
       if (isUnauthorized) {
         await supabase.auth.signOut();
@@ -58,11 +49,13 @@ export const Analytics: React.FC = () => {
 
   if (!stats) return null;
 
+  const activeRolesCount = stats.topPositions.length;
+
   const metricCards = [
     { label: 'Total Applications', value: stats.totalCandidates, icon: Users, color: 'text-primary', bg: 'bg-primary/10', trend: '+12%' },
-    { label: 'New Hires', value: stats.newCandidatesLast7Days, icon: UserCheck, color: 'text-secondary', bg: 'bg-secondary/10', trend: '+5%' },
+    { label: 'Recent (7 Days)', value: stats.recentCandidates.length, icon: UserCheck, color: 'text-secondary', bg: 'bg-secondary/10', trend: 'Live' },
     { label: 'Interviews', value: stats.statusRatios['Interviewing'] || 0, icon: Calendar, color: 'text-accent', bg: 'bg-accent/10', trend: '0%' },
-    { label: 'Open Positions', value: 8, icon: Briefcase, color: 'text-green-400', bg: 'bg-green-400/10', trend: '+2' },
+    { label: 'Active Roles', value: activeRolesCount, icon: Briefcase, color: 'text-green-400', bg: 'bg-green-400/10', trend: 'Real' },
   ];
 
   return (
@@ -104,7 +97,7 @@ export const Analytics: React.FC = () => {
 
           <div className="h-[300px] w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
+              <AreaChart data={stats.weeklyActivity}>
                 <defs>
                   <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3} />
@@ -135,29 +128,68 @@ export const Analytics: React.FC = () => {
         </div>
 
         <div className="glass-card p-8 rounded-[32px] border border-white/5 flex flex-col">
-          <h3 className="text-xl font-bold text-white mb-6">Status Breakdown</h3>
-          <div className="space-y-6 flex-1 flex flex-col justify-center">
-            {Object.entries(stats.statusRatios).map(([status, count]) => (
-              <div key={status} className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider">
-                  <span className="text-text-secondary">{status}</span>
-                  <span className="text-white">{Math.round((count / stats.totalCandidates) * 100)}%</span>
+          <h3 className="text-xl font-bold text-white mb-6">Recent Candidates</h3>
+          <div className="space-y-4 flex-1">
+            {stats.recentCandidates.length > 0 ? (
+              stats.recentCandidates.map((candidate) => (
+                <div key={candidate.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
+                      {candidate.full_name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white leading-tight">{candidate.full_name}</p>
+                      <p className="text-[10px] text-text-secondary">{candidate.applied_position}</p>
+                    </div>
+                  </div>
+                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${
+                    candidate.status === 'Hired' ? 'bg-green-400/20 text-green-400' :
+                    candidate.status === 'Rejected' ? 'bg-red-400/20 text-red-400' :
+                    'bg-primary/20 text-primary'
+                  }`}>
+                    {candidate.status}
+                  </span>
                 </div>
-                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${status === 'New' ? 'bg-blue-400' :
-                        status === 'Interviewing' ? 'bg-yellow-400' :
-                          status === 'Hired' ? 'bg-green-400' : 'bg-red-400'
-                      }`}
-                    style={{ width: `${(count / stats.totalCandidates) * 100}%` }}
-                  ></div>
+              ))
+            ) : (
+              <p className="text-[10px] text-text-secondary text-center py-10">No recent applications</p>
+            )}
+          </div>
+          <button className="mt-8 w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all">
+            See all candidates
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div className="lg:col-span-2 glass-card p-8 rounded-[32px] border border-white/5 flex flex-col">
+          <h3 className="text-xl font-bold text-white mb-6">Status Breakdown</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {Object.entries(stats.statusRatios).map(([status, count]) => (
+              <div key={status} className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <p className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1">{status}</p>
+                <div className="flex items-end gap-2">
+                  <p className="text-2xl font-black text-white">{count}</p>
+                  <p className="text-[8px] font-bold text-text-secondary mb-1">({Math.round((count / stats.totalCandidates) * 100)}%)</p>
                 </div>
               </div>
             ))}
           </div>
-          <button className="mt-8 w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all">
-            Detailed Report
-          </button>
+        </div>
+
+        <div className="glass-card p-8 rounded-[32px] border border-white/5 flex flex-col">
+          <h3 className="text-xl font-bold text-white mb-6">Top Roles</h3>
+          <div className="space-y-4">
+            {stats.topPositions.map((pos, idx) => (
+              <div key={pos.position} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-black text-text-secondary">0{idx + 1}</span>
+                  <span className="text-xs font-bold text-white">{pos.position}</span>
+                </div>
+                <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{pos.count}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
