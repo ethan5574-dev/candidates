@@ -47,10 +47,16 @@ export const Analytics: React.FC = () => {
   }, []);
 
   if (loading) return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="glass-card h-32 rounded-[24px] animate-pulse"></div>
-      ))}
+    <div className="space-y-10">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="glass-card h-32 rounded-[28px] animate-pulse"></div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div className="lg:col-span-2 glass-card h-[400px] rounded-[32px] animate-pulse"></div>
+        <div className="glass-card h-[400px] rounded-[32px] animate-pulse"></div>
+      </div>
     </div>
   );
 

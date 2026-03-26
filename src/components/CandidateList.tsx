@@ -225,8 +225,8 @@ export const CandidateList: React.FC = () => {
         )}
       </AnimatePresence>
 
-      <div className="glass-card rounded-[32px] border border-white/5 overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="glass-card rounded-[32px] border border-white/5">
+        <div className="overflow-x-auto pb-40 -mb-40">
           <table className="w-full text-left border-separate border-spacing-0">
             <thead>
               <tr className="bg-white/[0.02]">

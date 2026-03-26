@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
 import { useToast } from '../context/useToast';
+import { Dropdown } from './common/Dropdown';
 
 import type { Job, Skill } from '../types';
 
@@ -134,17 +135,15 @@ export const CandidateForm: React.FC<{ onComplete?: () => void }> = ({ onComplet
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
           <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 px-1">Target Job / Position</label>
-          <select
-            required
-            className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm appearance-none"
+          <Dropdown
             value={selectedJobId}
-            onChange={(e) => setSelectedJobId(e.target.value)}
-          >
-            <option value="" disabled className="bg-gray-900">Select an open role</option>
-            {jobs.map(job => (
-              <option key={job.id} value={job.id} className="bg-gray-900">{job.title}</option>
-            ))}
-          </select>
+            onChange={setSelectedJobId}
+            options={[
+              { id: '', label: 'Select an open role' },
+              ...jobs.map(job => ({ id: job.id, label: job.title }))
+            ]}
+            className="w-full"
+          />
         </motion.div>
 
         {/* Skills selection */}
