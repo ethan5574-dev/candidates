@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Search, MoreHorizontal, Download, Trash2, Briefcase, Sparkles, Filter, Tag } from 'lucide-react';
+import { Search, MoreHorizontal, Trash2, Briefcase, Sparkles, Filter, Tag } from 'lucide-react';
 import type { Candidate, Job } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dropdown } from './common/Dropdown';
@@ -51,11 +51,13 @@ export const CandidateList: React.FC = () => {
     if (error) showToast('Failed to delete', 'error');
   };
 
+  /* 
   const handleDownloadResume = async (path: string) => {
     const { data, error } = await supabase.storage.from('resumes').createSignedUrl(path, 60);
     if (error) showToast('Could not retrieve CV', 'error');
     else if (data?.signedUrl) window.open(data.signedUrl, '_blank');
-  };
+  }; 
+  */
 
   const fetchCandidates = async (isLoadMore = false) => {
     try {
