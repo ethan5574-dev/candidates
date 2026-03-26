@@ -25,3 +25,6 @@ dist-ssr
 
 # ENV 
 .env
+
+# Supabase
+supabase/.temp
