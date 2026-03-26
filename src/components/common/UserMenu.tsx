@@ -36,7 +36,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ email }) => {
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-primary to-secondary p-[1px]">
             <div className="w-full h-full rounded-lg bg-[#0d0f19] flex items-center justify-center overflow-hidden">
-               <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`} alt="avatar" />
+              <img src={`https://img.freepik.com/free-vector/blue-circle-with-white-user_78370-4707.jpg?t=st=1774530050~exp=1774533650~hmac=eee896db36590b7b9fb65f2e88c04b90e718b346a3affbf99e2011ec9bc1d8ed&w=2000`} alt="avatar" />
             </div>
           </div>
           <div className="text-left hidden md:block">
@@ -60,7 +60,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ email }) => {
               <p className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Signed in as</p>
               <p className="text-xs font-bold text-white truncate mt-0.5">{email}</p>
             </div>
-            
+
             <div className="space-y-1">
               <button className="flex w-full items-center gap-3 px-3 py-2 text-sm font-medium text-gray-300 rounded-xl hover:bg-white/5 hover:text-white transition-all">
                 <User className="w-4 h-4 text-primary" />

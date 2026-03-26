@@ -147,8 +147,8 @@ export const CandidateList: React.FC = () => {
               key={status}
               onClick={() => setStatusFilter(status)}
               className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${statusFilter === status
-                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                  : 'bg-white/5 text-text-secondary hover:bg-white/10'
+                ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                : 'bg-white/5 text-text-secondary hover:bg-white/10'
                 }`}
             >
               {status}
@@ -248,7 +248,7 @@ export const CandidateList: React.FC = () => {
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 overflow-hidden shadow-xl ring-1 ring-white/5">
-                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.full_name}`} alt="avatar" className="w-full h-full object-cover" />
+                        <img src={`https://img.freepik.com/free-vector/blue-circle-with-white-user_78370-4707.jpg?t=st=1774530050~exp=1774533650~hmac=eee896db36590b7b9fb65f2e88c04b90e718b346a3affbf99e2011ec9bc1d8ed&w=2000`} alt="avatar" className="w-full h-full object-cover" />
                       </div>
                       <div className="space-y-1">
                         <p className="text-sm font-black text-white group-hover:text-primary transition-colors">{c.full_name}</p>

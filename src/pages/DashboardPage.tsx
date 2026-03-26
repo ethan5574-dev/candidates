@@ -44,8 +44,8 @@ export function DashboardPage({ session }: DashboardPageProps) {
               key={item.id}
               onClick={() => setActiveTab(item.id as any)}
               className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-semibold transition-all group overflow-hidden ${activeTab === item.id
-                  ? 'bg-primary/10 text-primary border border-primary/20'
-                  : 'text-text-secondary hover:text-white hover:bg-white/5'
+                ? 'bg-primary/10 text-primary border border-primary/20'
+                : 'text-text-secondary hover:text-white hover:bg-white/5'
                 }`}
               title={item.label}
             >
@@ -79,7 +79,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
             className="flex items-center justify-between"
           >
             <div>
-              <h2 className="text-3xl font-bold tracking-tight">Welcome, HR Professional! 👋</h2>
+              <h2 className="text-3xl font-bold tracking-tight">Welcome, HR Professional! </h2>
               <p className="text-text-secondary mt-1 font-medium italic">Manage your talent pipeline with ease.</p>
             </div>
           </motion.div>
@@ -90,7 +90,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
                 <div className="lg:col-span-4 sticky top-8">
                   <div className="glass-card p-8 rounded-[32px] border border-white/5">
                     <h3 className="text-xl font-black text-white mb-6 tracking-tight">Add New Intel</h3>
-                    <CandidateForm onComplete={() => {}} />
+                    <CandidateForm onComplete={() => { }} />
                   </div>
                 </div>
                 <div className="lg:col-span-8">
@@ -109,7 +109,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
                 {activeTab === 'settings' && (
                   <div className="pt-10 border-t border-white/5">
                     <h4 className="text-sm font-bold text-white mb-4">Developer Tools</h4>
-                    <button 
+                    <button
                       onClick={async () => {
                         const { data: job, error: jobError } = await supabase
                           .from('jobs')
@@ -120,7 +120,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
                           })
                           .select()
                           .single();
-                        
+
                         if (jobError) return alert('Failed to seed job');
 
                         const requirements = ['React', 'TypeScript', 'Tailwind', 'Node.js'];
@@ -130,7 +130,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
                             job_id: job.id,
                             skill
                           })));
-                        
+
                         alert('Seeded "Senior React Developer" job successfully!');
                         window.location.reload();
                       }}
