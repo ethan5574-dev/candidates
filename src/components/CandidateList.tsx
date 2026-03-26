@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { Candidate } from '../types';
 import { Search, MoreHorizontal, Star, Download, Eye, Briefcase } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Dropdown } from './common/Dropdown';
 
 export const CandidateList: React.FC = () => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -27,6 +28,26 @@ export const CandidateList: React.FC = () => {
     return () => { supabase.removeChannel(subscription); };
   }, []);
 
+  const updateStatus = async (id: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('candidates')
+        .update({ status: newStatus })
+        .eq('id', id);
+        
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      const isUnauthorized = error.status === 401 || 
+                             error.message?.includes('Unauthorized') || 
+                             (error.context && error.context.status === 401);
+      if (isUnauthorized) {
+        await supabase.auth.signOut();
+        window.location.href = '/auth';
+      }
+    }
+  };
+
   const fetchCandidates = async () => {
     try {
       const { data, error } = await supabase.from('candidates').select('*').order('created_at', { ascending: false });
@@ -48,12 +69,41 @@ export const CandidateList: React.FC = () => {
   };
 
   const filteredCandidates = useMemo(() => {
-    return candidates.filter(c => {
-      const matchesSearch = c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           c.applied_position.toLowerCase().includes(searchTerm.toLowerCase());
+    let result = candidates.filter(c => {
       const matchesStatus = statusFilter === 'All' || c.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      return matchesStatus;
     });
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      // Implementation of "Matching Score" algorithm for Smart Sort
+      result = result.map(c => {
+        let score = 0;
+        const nameChars = c.full_name.toLowerCase();
+        const posChars = c.applied_position.toLowerCase();
+
+        // Exact match starts with (high priority)
+        if (nameChars.startsWith(term)) score += 100;
+        if (posChars.startsWith(term)) score += 80;
+
+        // Word match
+        if (nameChars.includes(term)) score += 50;
+        if (posChars.includes(term)) score += 40;
+
+        // Split word matches
+        const words = term.split(/\s+/);
+        words.forEach(word => {
+          if (nameChars.includes(word)) score += 10;
+          if (posChars.includes(word)) score += 5;
+        });
+
+        return { ...c, score };
+      })
+      .filter((c: any) => c.score > 0)
+      .sort((a: any, b: any) => b.score - a.score);
+    }
+
+    return result;
   }, [candidates, searchTerm, statusFilter]);
 
   if (loading) return (
@@ -100,15 +150,15 @@ export const CandidateList: React.FC = () => {
         </div>
       </div>
 
-      <div className="glass-card rounded-[32px] border border-white/5 overflow-hidden">
-        <table className="w-full text-left">
+      <div className="glass-card rounded-[32px] border border-white/5">
+        <table className="w-full text-left border-separate border-spacing-0">
           <thead className="bg-white/5 border-b border-white/5">
             <tr className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
-              <th className="px-8 py-5">Candidate Name</th>
+              <th className="px-8 py-5 rounded-tl-[31px]">Candidate Name</th>
               <th className="px-6 py-5">Role Applied</th>
               <th className="px-6 py-5">Rating</th>
               <th className="px-6 py-5">Status</th>
-              <th className="px-8 py-5 text-right">Action</th>
+              <th className="px-8 py-5 text-right rounded-tr-[31px]">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -145,14 +195,16 @@ export const CandidateList: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-6 py-5">
-                  <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider ${
-                    c.status === 'New' ? 'bg-blue-400/10 text-blue-400 border border-blue-400/20' : 
-                    c.status === 'Interviewing' ? 'bg-yellow-400/10 text-yellow-400 border border-yellow-400/20' : 
-                    c.status === 'Hired' ? 'bg-green-400/10 text-green-400 border border-green-400/20' : 
-                    'bg-red-400/10 text-red-400 border border-red-400/20'
-                  }`}>
-                    {c.status}
-                  </span>
+                  <Dropdown
+                    value={c.status}
+                    onChange={(val) => updateStatus(c.id, val)}
+                    options={[
+                      { id: 'New', label: 'New', colorClass: 'text-blue-400' },
+                      { id: 'Interviewing', label: 'Interviewing', colorClass: 'text-yellow-400' },
+                      { id: 'Hired', label: 'Hired', colorClass: 'text-green-400' },
+                      { id: 'Rejected', label: 'Rejected', colorClass: 'text-red-400' },
+                    ]}
+                  />
                 </td>
                 <td className="px-8 py-5 text-right">
                   <div className="flex items-center justify-end gap-2 translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">

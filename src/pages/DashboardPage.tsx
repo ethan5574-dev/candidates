@@ -1,11 +1,11 @@
-import { supabase } from '../lib/supabase'
 import { CandidateList } from '../components/CandidateList'
 import { CandidateForm } from '../components/CandidateForm'
 import { Analytics } from '../components/Analytics'
 import type { Session } from '@supabase/supabase-js'
-import { LayoutDashboard, Users, UserRound, PieChart, Briefcase, UserPlus, Settings, LogOut, Bell, Search, ChevronDown } from 'lucide-react'
+import { LayoutDashboard, Users, UserRound, PieChart, Briefcase, UserPlus, Settings, Bell, Search } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
+import { UserMenu } from '../components/common/UserMenu'
 
 interface DashboardPageProps {
   session: Session;
@@ -53,14 +53,13 @@ export function DashboardPage({ session }: DashboardPageProps) {
           ))}
         </nav>
 
-        <div className="p-4 mt-auto">
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-semibold text-text-secondary hover:bg-red-500/10 hover:text-red-400 transition-all"
-          >
-            <LogOut className="w-5 h-5" />
-            Logout
-          </button>
+        <div className="p-8 border-t border-white/5 mt-auto">
+          <div className="bg-gradient-to-br from-primary/20 to-secondary/20 rounded-3xl p-6 border border-white/5 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-12 translate-x-12 blur-2xl group-hover:bg-primary/20 transition-all duration-500"></div>
+            <p className="text-sm font-bold text-white relative z-10">Premium Plan</p>
+            <p className="text-[10px] text-text-secondary mt-1 relative z-10">Unlock advanced AI sorting & analytics</p>
+            <button className="mt-4 w-full py-2.5 bg-white text-black rounded-xl text-xs font-bold hover:bg-primary hover:text-white transition-all relative z-10">Upgrade Now</button>
+          </div>
         </div>
       </aside>
 
@@ -82,20 +81,13 @@ export function DashboardPage({ session }: DashboardPageProps) {
           </div>
 
           <div className="flex items-center gap-6">
-            <button className="relative p-2 rounded-xl border border-white/5 hover:bg-white/5 transition-all">
-              <Bell className="w-5 h-5 text-white/70" />
+            <button className="relative p-2 rounded-xl border border-white/5 hover:bg-white/5 transition-all text-white/70 hover:text-white">
+              <Bell className="w-5 h-5" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0d0f19]"></span>
             </button>
 
-            <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-white leading-none">{session.user.email?.split('@')[0]}</p>
-                <p className="text-[10px] text-text-secondary font-bold uppercase mt-1" title={session.user.email}>Admin</p>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-gray-700 to-gray-600 flex items-center justify-center border border-white/10 relative cursor-pointer hover:border-primary/50 transition-all">
-                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah`} className="w-full h-full rounded-xl" alt="avatar" />
-                <ChevronDown className="absolute -bottom-1 -right-1 w-3 h-3 bg-white/10 p-0.5 rounded-full border border-white/10" />
-              </div>
+            <div className="pl-4 border-l border-white/10">
+              <UserMenu email={session.user.email || 'HR Admin'} />
             </div>
           </div>
         </header>
