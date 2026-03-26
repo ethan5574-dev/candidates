@@ -1,8 +1,10 @@
 import { CandidateList } from '../components/CandidateList'
 import { CandidateForm } from '../components/CandidateForm'
 import { Analytics } from '../components/Analytics'
+import { SkillManagement } from '../components/SkillManagement'
+import { JobManagement } from '../components/JobManagement'
 import type { Session } from '@supabase/supabase-js'
-import { Users, Settings, PieChart } from 'lucide-react'
+import { Users, Settings, PieChart, Tag, Briefcase } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -13,10 +15,12 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ session }: DashboardPageProps) {
-  const [activeTab, setActiveTab] = useState('candidates');
+  const [activeTab, setActiveTab] = useState<'candidates' | 'jobs' | 'skills' | 'analytics' | 'settings'>('candidates');
 
   const navItems = [
     { id: 'candidates', label: 'Candidate Management', icon: Users },
+    { id: 'jobs', label: 'Job Listings', icon: Briefcase },
+    { id: 'skills', label: 'Skill Management', icon: Tag },
     { id: 'analytics', label: 'Real-time Analytics', icon: PieChart },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -38,7 +42,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => setActiveTab(item.id as any)}
               className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-semibold transition-all group overflow-hidden ${activeTab === item.id
                   ? 'bg-primary/10 text-primary border border-primary/20'
                   : 'text-text-secondary hover:text-white hover:bg-white/5'
@@ -82,29 +86,24 @@ export function DashboardPage({ session }: DashboardPageProps) {
 
           <div className="space-y-10">
             {activeTab === 'candidates' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                <div className="lg:col-span-1 space-y-6">
-                  <h3 className="text-xl font-bold flex items-center gap-3">
-                    <span className="w-1 h-6 bg-secondary rounded-full"></span>
-                    Quick Add
-                  </h3>
-                  <CandidateForm />
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <div className="lg:col-span-4 sticky top-8">
+                  <div className="glass-card p-8 rounded-[32px] border border-white/5">
+                    <h3 className="text-xl font-black text-white mb-6 tracking-tight">Add New Intel</h3>
+                    <CandidateForm onComplete={() => {}} />
+                  </div>
                 </div>
-                <div className="lg:col-span-2 space-y-6">
-                  <h3 className="text-xl font-bold flex items-center gap-3">
-                    <span className="w-1 h-6 bg-accent rounded-full"></span>
-                    Candidate List
-                  </h3>
+                <div className="lg:col-span-8">
                   <CandidateList />
                 </div>
               </div>
             )}
 
-            {activeTab === 'analytics' && (
-              <Analytics />
-            )}
+            {activeTab === 'jobs' && <JobManagement />}
+            {activeTab === 'skills' && <SkillManagement />}
+            {activeTab === 'analytics' && <Analytics />}
 
-            {(activeTab !== 'candidates' && activeTab !== 'analytics') && (
+            {(activeTab === 'settings') && (
               <div className="glass-card p-20 rounded-[32px] text-center space-y-6">
                 <p className="text-text-secondary font-bold text-xl uppercase tracking-widest opacity-20">{activeTab} Section coming soon</p>
                 {activeTab === 'settings' && (

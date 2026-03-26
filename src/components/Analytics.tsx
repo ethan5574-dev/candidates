@@ -148,7 +148,7 @@ export const Analytics: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-xs font-bold text-white leading-tight">{candidate.full_name}</p>
-                      <p className="text-[10px] text-text-secondary">{candidate.applied_position}</p>
+                      <p className="text-[10px] text-text-secondary">{candidate.job_title}</p>
                     </div>
                   </div>
                   <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${

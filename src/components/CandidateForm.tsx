@@ -1,27 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
 import { useToast } from '../context/useToast';
 
-import type { Job } from '../types';
+import type { Job, Skill } from '../types';
 
 export const CandidateForm: React.FC<{ onComplete?: () => void }> = ({ onComplete }) => {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState('');
-  const [position, setPosition] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [skills, setSkills] = useState('');
+  const [globalSkills, setGlobalSkills] = useState<Skill[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJobId, setSelectedJobId] = useState('');
 
-  React.useEffect(() => {
-    const fetchJobs = async () => {
-      const { data } = await supabase.from('jobs').select('*');
-      if (data) setJobs(data);
-    };
+  useEffect(() => {
     fetchJobs();
+    fetchSkills();
   }, []);
+
+  const fetchJobs = async () => {
+    const { data } = await supabase.from('jobs').select('*').order('created_at', { ascending: false });
+    if (data) setJobs(data);
+  };
+
+  const fetchSkills = async () => {
+    const { data } = await supabase.from('skills').select('*').order('skill_name', { ascending: true });
+    if (data) setGlobalSkills(data);
+  };
+
+  const toggleSkill = (skillName: string) => {
+    if (selectedSkills.includes(skillName)) {
+      setSelectedSkills(prev => prev.filter(s => s !== skillName));
+    } else {
+      setSelectedSkills(prev => [...prev, skillName]);
+    }
+  };
 
   const uploadFile = async (file: File) => {
     const fileExt = file.name.split('.').pop();
@@ -47,10 +62,9 @@ export const CandidateForm: React.FC<{ onComplete?: () => void }> = ({ onComplet
           const { data, error } = await supabase.functions.invoke('add-candidate', {
             body: {
               full_name: filesToUpload.length > 1 ? `${fullName} (${file.name})` : fullName,
-              applied_position: position,
-              resume_path: path,
-              skills: skills.split(',').map(s => s.trim()).filter(Boolean),
-              job_id: selectedJobId || null
+              job_id: selectedJobId,
+              resume_url: path,
+              skills: selectedSkills,
             },
           });
           if (error) throw error;
@@ -85,9 +99,9 @@ export const CandidateForm: React.FC<{ onComplete?: () => void }> = ({ onComplet
       await processParallelUploads(files, 3);
       
       setFullName('');
-      setPosition('');
       setFiles([]);
-      setSkills('');
+      setSelectedSkills([]);
+      setSelectedJobId('');
       showToast(`Đã thêm ${files.length} ứng viên thành công!`, 'success');
       if (onComplete) onComplete();
 
@@ -118,42 +132,46 @@ export const CandidateForm: React.FC<{ onComplete?: () => void }> = ({ onComplet
             placeholder="e.g. David Chen"
           />
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 px-1">Applied Position</label>
-          <input
-            type="text"
-            required
-            className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm"
-            value={position}
-            onChange={(e) => setPosition(e.target.value)}
-            placeholder="e.g. Senior Frontend Engineer"
-          />
-        </motion.div>
-        {/* Job Selection */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 px-1">Linked Job (Optional)</label>
+          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 px-1">Target Job / Position</label>
           <select
+            required
             className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm appearance-none"
             value={selectedJobId}
             onChange={(e) => setSelectedJobId(e.target.value)}
           >
-            <option value="" className="bg-gray-900">General Recruitment</option>
+            <option value="" disabled className="bg-gray-900">Select an open role</option>
             {jobs.map(job => (
               <option key={job.id} value={job.id} className="bg-gray-900">{job.title}</option>
             ))}
           </select>
         </motion.div>
 
-        {/* Skills input */}
+        {/* Skills selection */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
-          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 px-1">Candidate Skills (Comma separated)</label>
-          <input
-            type="text"
-            className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm"
-            value={skills}
-            onChange={(e) => setSkills(e.target.value)}
-            placeholder="e.g. React, Node.js, TypeScript"
-          />
+          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 px-1">Candidate Skills</label>
+          <div className="flex flex-wrap gap-2 bg-white/5 p-4 rounded-2xl border border-white/5 max-h-[120px] overflow-y-auto custom-scrollbar">
+            {globalSkills.map(s => {
+              const isSelected = selectedSkills.includes(s.skill_name);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => toggleSkill(s.skill_name)}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border ${
+                    isSelected 
+                      ? 'bg-primary border-primary text-white' 
+                      : 'bg-white/5 border-white/10 text-text-secondary hover:border-white/30'
+                  }`}
+                >
+                  {s.skill_name}
+                </button>
+              );
+            })}
+            {globalSkills.length === 0 && (
+              <p className="text-[10px] text-text-secondary opacity-30 italic">No skills available. Please add them in Skills tab.</p>
+            )}
+          </div>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>

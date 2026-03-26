@@ -1,14 +1,18 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Search, MoreHorizontal, Download, Trash2, Briefcase, Sparkles, Filter } from 'lucide-react';
+import { Search, MoreHorizontal, Download, Trash2, Briefcase, Sparkles, Filter, Tag } from 'lucide-react';
 import type { Candidate, Job } from '../types';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Dropdown } from './common/Dropdown';
 import { useToast } from '../context/useToast';
 
+interface CandidateWithJob extends Candidate {
+  jobs: { title: string } | null;
+}
+
 export const CandidateList: React.FC = () => {
   const { showToast } = useToast();
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [candidates, setCandidates] = useState<CandidateWithJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,74 +22,39 @@ export const CandidateList: React.FC = () => {
   const [recommendations, setRecommendations] = useState<Candidate[]>([]);
   const [loadingRecs, setLoadingRecs] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const PAGE_SIZE = 5;
+  const PAGE_SIZE = 8;
 
   useEffect(() => {
     fetchCandidates();
     fetchJobs();
+    
     const subscription = supabase
       .channel('candidates_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, (payload) => {
-        if (payload.eventType === 'INSERT' && payload.new) {
-          setCandidates((prev) => [payload.new as Candidate, ...prev]);
-        } else if (payload.eventType === 'UPDATE' && payload.new) {
-          setCandidates((prev) => prev.map((c) => (c.id === payload.new.id ? { ...c, ...payload.new } as Candidate : c)));
-        } else if (payload.eventType === 'DELETE' && payload.old) {
-          setCandidates((prev) => prev.filter((c) => c.id !== payload.old.id));
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, () => {
+        fetchCandidates(); // Refresh to get joined data easily
       })
       .subscribe();
+      
     return () => { supabase.removeChannel(subscription); };
   }, []);
 
   const updateStatus = async (id: string, newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from('candidates')
-        .update({ status: newStatus })
-        .eq('id', id);
-        
-      if (error) throw error;
-    } catch (error: Error | unknown) {
-      console.error('Error updating status:', error);
-      const err = error as { status?: number; message?: string };
-      const isUnauthorized = err.status === 401 || 
-                             err.message?.includes('Unauthorized');
-      if (isUnauthorized) {
-        await supabase.auth.signOut();
-        window.location.href = '/auth';
-      }
+    const { error } = await supabase.from('candidates').update({ status: newStatus }).eq('id', id);
+    if (error) {
+      showToast('Failed to update status', 'error');
     }
   };
 
   const handleDeleteCandidate = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this candidate?')) return;
-    
-    try {
-      const { error } = await supabase
-        .from('candidates')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-    } catch (error: Error | unknown) {
-      console.error('Error deleting candidate:', error);
-    }
+    if (!window.confirm('Are you sure?')) return;
+    const { error } = await supabase.from('candidates').delete().eq('id', id);
+    if (error) showToast('Failed to delete', 'error');
   };
 
   const handleDownloadResume = async (path: string) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('resumes')
-        .createSignedUrl(path, 60);
-      
-      if (error) throw error;
-      if (data?.signedUrl) {
-        window.open(data.signedUrl, '_blank');
-      }
-    } catch (error: Error | unknown) {
-      console.error('Error getting signed URL:', error);
-      showToast('Could not retrieve CV. Please try again.', 'error');
-    }
+    const { data, error } = await supabase.storage.from('resumes').createSignedUrl(path, 60);
+    if (error) showToast('Could not retrieve CV', 'error');
+    else if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   };
 
   const fetchCandidates = async (isLoadMore = false) => {
@@ -95,36 +64,23 @@ export const CandidateList: React.FC = () => {
 
       let query = supabase
         .from('candidates')
-        .select('*')
+        .select('*, jobs(title)')
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
 
       if (isLoadMore && candidates.length > 0) {
-        const lastCandidate = candidates[candidates.length - 1];
-        query = query.lt('created_at', lastCandidate.created_at);
+        query = query.lt('created_at', candidates[candidates.length - 1].created_at);
       }
 
       const { data, error } = await query;
       if (error) throw error;
 
       if (data) {
-        if (isLoadMore) {
-          setCandidates(prev => [...prev, ...data]);
-        } else {
-          setCandidates(data);
-        }
+        setCandidates(prev => isLoadMore ? [...prev, ...data] : data);
         setHasMore(data.length === PAGE_SIZE);
       }
-    } catch (error: Error | unknown) {
-      console.error('Error fetching candidates:', error);
-      const err = error as { status?: number; message?: string };
-      const isUnauthorized = err.status === 401 || 
-                             err.message?.includes('Unauthorized');
-                             
-      if (isUnauthorized) {
-        await supabase.auth.signOut();
-        window.location.href = '/auth';
-      }
+    } catch (e) {
+      showToast('Error loading candidates', 'error');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -140,14 +96,11 @@ export const CandidateList: React.FC = () => {
     if (!jobFilter) return;
     setLoadingRecs(true);
     try {
-      // Note: supabase.functions.invoke doesn't support query params directly in the first arg easily
-      // Better to use a standard fetch if needed, or invoke doesn't mind extra params
       const { data: recData, error: recError } = await supabase.functions.invoke(`recommend?job_id=${jobFilter}`);
       if (recError) throw recError;
       setRecommendations(recData || []);
       showToast('AI Recommendations loaded!', 'success');
     } catch (error) {
-      console.error('Error getting recommendations:', error);
       showToast('Failed to get recommendations', 'error');
     } finally {
       setLoadingRecs(false);
@@ -163,40 +116,24 @@ export const CandidateList: React.FC = () => {
 
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
-      // Implementation of "Matching Score" algorithm for Smart Sort
-      result = (result as (Candidate & { score: number })[]).map(c => {
+      result = (result as (CandidateWithJob & { score: number })[]).map(c => {
         let score = 0;
-        const nameChars = (c.full_name || '').toLowerCase();
-        const posChars = (c.applied_position || '').toLowerCase();
-
-        // Exact match starts with (high priority)
-        if (nameChars.startsWith(term)) score += 100;
-        if (posChars.startsWith(term)) score += 80;
-
-        // Word match
-        if (nameChars.includes(term)) score += 50;
-        if (posChars.includes(term)) score += 40;
-
-        // Split word matches
-        const words = term.split(/\s+/);
-        words.forEach(word => {
-          if (nameChars.includes(word)) score += 10;
-          if (posChars.includes(word)) score += 5;
-        });
-
+        const name = (c.full_name || '').toLowerCase();
+        const jobTitle = (c.jobs?.title || '').toLowerCase();
+        if (name.includes(term)) score += 100;
+        if (jobTitle.includes(term)) score += 50;
         return { ...c, score };
       })
       .filter(c => c.score > 0)
-      .sort((a, b) => b.score - a.score);
+      .sort((a,b) => b.score - a.score);
     }
-
     return result;
-  }, [candidates, searchTerm, statusFilter]);
+  }, [candidates, searchTerm, statusFilter, jobFilter]);
 
   if (loading) return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 gap-4">
       {[...Array(5)].map((_, i) => (
-        <div key={i} className="glass-card h-20 rounded-[20px] animate-pulse"></div>
+        <div key={i} className="glass-card h-24 rounded-[32px] animate-pulse"></div>
       ))}
     </div>
   );
@@ -204,48 +141,43 @@ export const CandidateList: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setStatusFilter('All')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${statusFilter === 'All' ? 'bg-primary text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
-          >
-            All Candidates
-          </button>
-          <button 
-            onClick={() => setStatusFilter('Interviewing')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${statusFilter === 'Interviewing' ? 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/20' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
-          >
-            Interviews
-          </button>
-          <button 
-            onClick={() => setStatusFilter('Hired')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${statusFilter === 'Hired' ? 'bg-green-400/20 text-green-400 border border-green-400/20' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
-          >
-            Hired
-          </button>
+        <div className="flex items-center gap-2">
+          {['All', 'New', 'Interviewing', 'Hired'].map(status => (
+            <button 
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                statusFilter === status 
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                  : 'bg-white/5 text-text-secondary hover:bg-white/10'
+              }`}
+            >
+              {status}
+            </button>
+          ))}
         </div>
 
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="relative min-w-[200px]">
-            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative group">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary group-focus-within:text-primary transition-colors" />
             <select 
-              className="w-full pl-12 pr-10 py-2.5 bg-white/5 border border-white/5 rounded-xl text-sm focus:outline-none focus:bg-white/10 appearance-none text-white"
+              className="pl-12 pr-10 py-2.5 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-bold uppercase tracking-widest focus:outline-none focus:bg-white/10 appearance-none text-white min-w-[180px]"
               value={jobFilter}
               onChange={(e) => setJobFilter(e.target.value)}
             >
-              <option value="">All Positions</option>
+              <option value="" className="bg-gray-900">All Jobs</option>
               {jobs.map(job => (
                 <option key={job.id} value={job.id} className="bg-gray-900">{job.title}</option>
               ))}
             </select>
           </div>
 
-          <div className="relative group min-w-[280px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary group-focus-within:text-primary transition-colors" />
+          <div className="relative group min-w-[240px]">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary group-focus-within:text-primary transition-colors" />
             <input 
               type="text" 
-              placeholder="Search candidates..." 
-              className="w-full pl-12 pr-4 py-2.5 bg-white/5 border border-white/5 rounded-xl text-sm focus:outline-none focus:bg-white/10 transition-all"
+              placeholder="Search application..." 
+              className="w-full pl-12 pr-4 py-2.5 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-bold uppercase tracking-widest focus:outline-none focus:bg-white/10 transition-all text-white"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -255,154 +187,154 @@ export const CandidateList: React.FC = () => {
             <button
               onClick={getRecommendations}
               disabled={loadingRecs}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-accent to-primary rounded-xl text-white text-xs font-bold hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-accent to-primary rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:shadow-xl hover:shadow-primary/30 transition-all active:scale-95 disabled:opacity-50"
             >
-              <Sparkles className={`w-4 h-4 ${loadingRecs ? 'animate-pulse' : ''}`} />
-              {loadingRecs ? 'Analyzing...' : '⚡ AI Recommend Top 3'}
+              <Sparkles className={`w-3.5 h-3.5 ${loadingRecs ? 'animate-pulse' : ''}`} />
+              {loadingRecs ? 'Analyzing...' : '⚡ AI Suggest'}
             </button>
           )}
         </div>
       </div>
 
-      {recommendations.length > 0 && jobFilter && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card p-6 border border-primary/20 bg-primary/5 rounded-[32px] space-y-4"
-        >
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-bold flex items-center gap-2 text-primary">
-              <Sparkles className="w-4 h-4" />
-              Top 3 AI Recommendations
-            </h4>
-            <button 
-              onClick={() => setRecommendations([])}
-              className="text-[10px] font-bold text-text-secondary hover:text-white uppercase tracking-widest"
-            >
-              Dismiss
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {recommendations.map((c) => (
-              <div key={c.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                  {c.match_score}%
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-white">{c.full_name}</p>
-                  <p className="text-[10px] text-text-secondary">{c.applied_position}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {recommendations.length > 0 && jobFilter && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="glass-card p-6 border border-primary/20 bg-primary/5 rounded-[32px] relative overflow-hidden group"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-[10px] font-black flex items-center gap-2 text-primary uppercase tracking-[0.2em]">
+                <Sparkles className="w-3.5 h-3.5" /> Top AI Matching
+              </h4>
+              <button onClick={() => setRecommendations([])} className="text-[10px] font-bold text-text-secondary hover:text-white uppercase tracking-widest">Close</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {recommendations.map((c) => (
+                <motion.div key={c.id} whileHover={{ y: -4 }} className="bg-[#0f172a]/50 p-4 rounded-2xl border border-white/5 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-xs border border-primary/20">{c.match_score}%</div>
+                  <div>
+                    <p className="text-xs font-black text-white">{c.full_name}</p>
+                    <p className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mt-1">Recommended</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="glass-card rounded-[32px] border border-white/5">
-        <table className="w-full text-left border-separate border-spacing-0">
-          <thead className="bg-white/5 border-b border-white/5">
-            <tr className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
-              <th className="px-8 py-5 rounded-tl-[31px]">Candidate Name</th>
-              <th className="px-6 py-5">Role Applied</th>
-              <th className="px-6 py-5">Match Score</th>
-              <th className="px-6 py-5">Status</th>
-              <th className="px-8 py-5 text-right rounded-tr-[31px]">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {filteredCandidates.map((c, i) => (
-              <motion.tr 
-                key={c.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="group hover:bg-white/[0.02] transition-colors"
-              >
-                <td className="px-8 py-5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 overflow-hidden shadow-lg">
-                      <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.full_name}`} alt="avatar" />
+      <div className="glass-card rounded-[32px] border border-white/5 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-separate border-spacing-0">
+            <thead>
+              <tr className="bg-white/[0.02]">
+                <th className="px-8 py-5 text-[10px] font-black text-text-secondary uppercase tracking-widest">Candidate</th>
+                <th className="px-6 py-5 text-[10px] font-black text-text-secondary uppercase tracking-widest">Target Job</th>
+                <th className="px-6 py-5 text-[10px] font-black text-text-secondary uppercase tracking-widest text-center">Fit Score</th>
+                <th className="px-6 py-5 text-[10px] font-black text-text-secondary uppercase tracking-widest text-center">Status</th>
+                <th className="px-8 py-5 text-[10px] font-black text-text-secondary uppercase tracking-widest text-right">Resume</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filteredCandidates.map((c, i) => (
+                <motion.tr 
+                  key={c.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                  className="group hover:bg-white/[0.02] transition-colors"
+                >
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 overflow-hidden shadow-xl ring-1 ring-white/5">
+                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.full_name}`} alt="avatar" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-black text-white group-hover:text-primary transition-colors">{c.full_name}</p>
+                        <div className="flex flex-wrap gap-1">
+                          {c.skills.slice(0, 3).map(s => (
+                            <span key={s} className="px-1.5 py-0.5 bg-white/5 rounded-md text-[8px] font-bold text-text-secondary flex items-center gap-1">
+                              <Tag className="w-2 h-2" /> {s}
+                            </span>
+                          ))}
+                          {c.skills.length > 3 && <span className="text-[8px] font-bold text-text-secondary opacity-50">+{c.skills.length - 3} more</span>}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{c.full_name}</p>
-                      <p className="text-[10px] font-bold text-text-secondary mt-0.5">{new Date(c.created_at).toLocaleDateString()}</p>
+                  </td>
+                  <td className="px-6 py-6">
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="w-3.5 h-3.5 text-primary opacity-50" />
+                      <span className="text-[11px] font-black text-white uppercase tracking-wider">{c.jobs?.title || 'General Role'}</span>
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-5">
-                  <div className="flex items-center gap-2">
-                    <Briefcase className="w-3.5 h-3.5 text-text-secondary" />
-                    <span className="text-xs font-semibold text-white/80">{c.applied_position}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-12 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-1000 ${
-                          (c.match_score || 0) > 70 ? 'bg-green-400' : (c.match_score || 0) > 40 ? 'bg-yellow-400' : 'bg-red-400'
-                        }`}
-                        style={{ width: `${c.match_score || 0}%` }}
-                      ></div>
+                  </td>
+                  <td className="px-6 py-6">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden ring-1 ring-white/5">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${c.match_score || 0}%` }}
+                          transition={{ duration: 1, delay: 0.5 }}
+                          className={`h-full rounded-full ${
+                            (c.match_score || 0) > 70 ? 'bg-primary' : (c.match_score || 0) > 40 ? 'bg-accent' : 'bg-red-500'
+                          }`}
+                        ></motion.div>
+                      </div>
+                      <span className="text-[10px] font-black text-white/40">{c.match_score || 0}%</span>
                     </div>
-                    <span className="text-[10px] font-bold text-white/50">{c.match_score || 0}%</span>
-                  </div>
-                </td>
-                <td className="px-6 py-5">
-                  <Dropdown
-                    value={c.status}
-                    onChange={(val) => updateStatus(c.id, val)}
-                    options={[
-                      { id: 'New', label: 'New', colorClass: 'text-blue-400' },
-                      { id: 'Interviewing', label: 'Interviewing', colorClass: 'text-yellow-400' },
-                      { id: 'Hired', label: 'Hired', colorClass: 'text-green-400' },
-                      { id: 'Rejected', label: 'Rejected', colorClass: 'text-red-400' },
-                    ]}
-                  />
-                </td>
-                <td className="px-8 py-5 text-right">
-                  <div className="flex items-center justify-end gap-2 translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                    {c.resume_path && (
+                  </td>
+                  <td className="px-6 py-6 text-center">
+                    <Dropdown
+                      value={c.status}
+                      onChange={(val) => updateStatus(c.id, val)}
+                      options={[
+                        { id: 'New', label: 'New', colorClass: 'text-blue-400' },
+                        { id: 'Interviewing', label: 'Interviewing', colorClass: 'text-accent' },
+                        { id: 'Hired', label: 'Hired', colorClass: 'text-primary' },
+                        { id: 'Rejected', label: 'Rejected', colorClass: 'text-red-400' },
+                      ]}
+                      className="!min-w-[120px]"
+                    />
+                  </td>
+                  <td className="px-8 py-6 text-right">
+                    <div className="flex items-center justify-end gap-2 translate-x-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                      {c.resume_url && (
+                        <button 
+                          onClick={() => handleDownloadResume(c.resume_url!)}
+                          className="p-2.5 bg-white/5 hover:bg-primary/20 rounded-xl text-text-secondary hover:text-primary transition-all border border-white/5 hover:border-primary/30"
+                        ><Download className="w-4 h-4" /></button>
+                      )}
                       <button 
-                        onClick={() => handleDownloadResume(c.resume_path!)}
-                        className="p-2 hover:bg-white/10 rounded-lg text-text-secondary hover:text-white transition-all"
-                        title="View CV"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button 
-                      onClick={() => handleDeleteCandidate(c.id)}
-                      className="p-2 hover:bg-red-500/10 rounded-lg text-text-secondary hover:text-red-400 transition-all"
-                      title="Delete Candidate"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 hover:bg-white/10 rounded-lg text-text-secondary hover:text-white transition-all">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </motion.tr>
-            ))}
-          </tbody>
-        </table>
+                        onClick={() => handleDeleteCandidate(c.id)}
+                        className="p-2.5 bg-white/5 hover:bg-red-500/20 rounded-xl text-text-secondary hover:text-red-400 transition-all border border-white/5 hover:border-red-500/30"
+                      ><Trash2 className="w-4 h-4" /></button>
+                      <button className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-text-secondary hover:text-white transition-all border border-white/5"><MoreHorizontal className="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                </motion.tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         
         {filteredCandidates.length === 0 && (
-          <div className="p-20 text-center">
-            <p className="text-text-secondary font-bold uppercase tracking-widest text-sm opacity-20">No matching candidates found</p>
+          <div className="py-24 text-center">
+            <div className="inline-flex p-6 bg-white/5 rounded-full mb-4"><Search className="w-8 h-8 text-text-secondary opacity-20" /></div>
+            <p className="text-text-secondary font-black uppercase tracking-[0.3em] text-[10px] opacity-20">Database is empty or no matches</p>
           </div>
         )}
       </div>
 
       {hasMore && (
-        <div className="flex justify-center">
+        <div className="flex justify-center pt-4">
           <button
             onClick={() => fetchCandidates(true)}
             disabled={loadingMore}
-            className="px-8 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all text-text-secondary hover:text-white disabled:opacity-50"
+            className="flex items-center gap-3 px-10 py-4 bg-white/5 hover:bg-white/[0.08] border border-white/5 rounded-[24px] text-[10px] font-black uppercase tracking-[0.2em] transition-all text-text-secondary hover:text-white active:scale-95 disabled:opacity-50"
           >
-            {loadingMore ? 'Loading...' : 'Load More Candidates'}
+            {loadingMore ? 'Syncing...' : 'Load More Intel'}
           </button>
         </div>
       )}

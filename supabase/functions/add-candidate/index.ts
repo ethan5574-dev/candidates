@@ -6,10 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
 }
 
-interface CandidateRequest {
-  full_name: string;
-  applied_position: string;
-  resume_path?: string;
+interface JobSkill {
+  skill_name: string;
+  weight: number;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -32,9 +31,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const { full_name, applied_position, resume_path, skills, job_id } = await req.json()
+    const { full_name, job_id, resume_url, skills } = await req.json()
 
-    // Get user id from token
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -43,27 +41,38 @@ Deno.serve(async (req: Request): Promise<Response> => {
       })
     }
 
-    // Basic validation
-    if (!full_name || !applied_position) {
-      throw new Error('Full name and applied position are required.')
+    if (!full_name || !job_id) {
+      throw new Error('Full name and job selection are required.')
     }
 
-    // 1. Calculate matching score if job_id is provided
+    // 1. Calculate weighted matching score
     let match_score = 0;
-    const candidateSkills = Array.isArray(skills) ? skills : [];
+    const candidateSkills = Array.isArray(skills) ? (skills as string[]) : [];
 
-    if (job_id) {
-      const { data: requirements, error: reqError } = await supabaseClient
-        .from('job_requirements')
-        .select('skill')
-        .eq('job_id', job_id);
-      
-      if (!reqError && requirements && requirements.length > 0) {
-        const requiredSkills = requirements.map(r => r.skill.toLowerCase());
-        const matchedSkills = candidateSkills.filter(s => 
-          requiredSkills.includes(s.toLowerCase())
-        );
-        match_score = (matchedSkills.length / requiredSkills.length) * 100;
+    const { data: job, error: jobError } = await supabaseClient
+      .from('jobs')
+      .select('skills')
+      .eq('id', job_id)
+      .single();
+    
+    if (!jobError && job && job.skills && Array.isArray(job.skills)) {
+      const jobRequirements = job.skills as JobSkill[];
+      if (jobRequirements.length > 0) {
+        let totalPossibleWeight = 0;
+        let matchedWeight = 0;
+
+        jobRequirements.forEach(req => {
+          const weight = Number(req.weight) || 0;
+          totalPossibleWeight += weight;
+          
+          if (candidateSkills.some(s => s.toLowerCase() === req.skill_name.toLowerCase())) {
+            matchedWeight += weight;
+          }
+        });
+
+        if (totalPossibleWeight > 0) {
+          match_score = (matchedWeight / totalPossibleWeight) * 100;
+        }
       }
     }
 
@@ -73,11 +82,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .insert({
         user_id: user.id,
         full_name,
-        applied_position,
-        resume_path,
+        job_id,
+        resume_url: resume_url || null,
         status: 'New',
         skills: candidateSkills,
-        job_id,
         match_score: Math.round(match_score)
       })
       .select()
