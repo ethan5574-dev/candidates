@@ -27,14 +27,14 @@ export const CandidateList: React.FC = () => {
   useEffect(() => {
     fetchCandidates();
     fetchJobs();
-    
+
     const subscription = supabase
       .channel('candidates_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, () => {
         fetchCandidates(); // Refresh to get joined data easily
       })
       .subscribe();
-      
+
     return () => { supabase.removeChannel(subscription); };
   }, []);
 
@@ -124,8 +124,8 @@ export const CandidateList: React.FC = () => {
         if (jobTitle.includes(term)) score += 50;
         return { ...c, score };
       })
-      .filter(c => c.score > 0)
-      .sort((a,b) => b.score - a.score);
+        .filter(c => c.score > 0)
+        .sort((a, b) => b.score - a.score);
     }
     return result;
   }, [candidates, searchTerm, statusFilter, jobFilter]);
@@ -143,14 +143,13 @@ export const CandidateList: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           {['All', 'New', 'Interviewing', 'Hired'].map(status => (
-            <button 
+            <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                statusFilter === status 
-                  ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${statusFilter === status
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
                   : 'bg-white/5 text-text-secondary hover:bg-white/10'
-              }`}
+                }`}
             >
               {status}
             </button>
@@ -160,7 +159,7 @@ export const CandidateList: React.FC = () => {
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative group">
             <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary group-focus-within:text-primary transition-colors" />
-            <select 
+            <select
               className="pl-12 pr-10 py-2.5 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-bold uppercase tracking-widest focus:outline-none focus:bg-white/10 appearance-none text-white min-w-[180px]"
               value={jobFilter}
               onChange={(e) => setJobFilter(e.target.value)}
@@ -174,9 +173,9 @@ export const CandidateList: React.FC = () => {
 
           <div className="relative group min-w-[240px]">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary group-focus-within:text-primary transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Search application..." 
+            <input
+              type="text"
+              placeholder="Search application..."
               className="w-full pl-12 pr-4 py-2.5 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-bold uppercase tracking-widest focus:outline-none focus:bg-white/10 transition-all text-white"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -198,7 +197,7 @@ export const CandidateList: React.FC = () => {
 
       <AnimatePresence>
         {recommendations.length > 0 && jobFilter && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -239,7 +238,7 @@ export const CandidateList: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-white/5">
               {filteredCandidates.map((c, i) => (
-                <motion.tr 
+                <motion.tr
                   key={c.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -273,13 +272,12 @@ export const CandidateList: React.FC = () => {
                   <td className="px-6 py-6">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden ring-1 ring-white/5">
-                        <motion.div 
+                        <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${c.match_score || 0}%` }}
                           transition={{ duration: 1, delay: 0.5 }}
-                          className={`h-full rounded-full ${
-                            (c.match_score || 0) > 70 ? 'bg-primary' : (c.match_score || 0) > 40 ? 'bg-accent' : 'bg-red-500'
-                          }`}
+                          className={`h-full rounded-full ${(c.match_score || 0) > 70 ? 'bg-primary' : (c.match_score || 0) > 40 ? 'bg-accent' : 'bg-red-500'
+                            }`}
                         ></motion.div>
                       </div>
                       <span className="text-[10px] font-black text-white/40">{c.match_score || 0}%</span>
@@ -300,13 +298,13 @@ export const CandidateList: React.FC = () => {
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex items-center justify-end gap-2 translate-x-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                      {c.resume_url && (
+                      {/* {c.resume_url && (
                         <button 
                           onClick={() => handleDownloadResume(c.resume_url!)}
                           className="p-2.5 bg-white/5 hover:bg-primary/20 rounded-xl text-text-secondary hover:text-primary transition-all border border-white/5 hover:border-primary/30"
                         ><Download className="w-4 h-4" /></button>
-                      )}
-                      <button 
+                      )} */}
+                      <button
                         onClick={() => handleDeleteCandidate(c.id)}
                         className="p-2.5 bg-white/5 hover:bg-red-500/20 rounded-xl text-text-secondary hover:text-red-400 transition-all border border-white/5 hover:border-red-500/30"
                       ><Trash2 className="w-4 h-4" /></button>
@@ -318,7 +316,7 @@ export const CandidateList: React.FC = () => {
             </tbody>
           </table>
         </div>
-        
+
         {filteredCandidates.length === 0 && (
           <div className="py-24 text-center">
             <div className="inline-flex p-6 bg-white/5 rounded-full mb-4"><Search className="w-8 h-8 text-text-secondary opacity-20" /></div>

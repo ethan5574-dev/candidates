@@ -1,58 +1,80 @@
-# Candidate Management System
+# 🚀 Candidate Management Mini-App
 
-Dự án quản lý ứng viên sử dụng React, TypeScript và Supabase (được kết nối tới dự án Supabase Cloud của bạn).
+A structured, professional HR recruitment platform built with **React 19**, **TypeScript**, **Tailwind CSS 4**, and **Supabase**. This application allows HR teams to manage a global skill directory, create job roles with weighted requirements, and track candidates with an AI-driven matching algorithm.
 
-## 1. Yêu cầu hệ thống (Prerequisites)
-- [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started).
-- [Node.js](https://nodejs.org/) (phiên bản mới nhất).
-- Tài khoản [Supabase](https://supabase.com/) và một project đã được khởi tạo.
+## ✨ Key Features
 
-## 2. Cách chạy dự án
+### 1. Relational HR Workflow
+- **Global Skill Directory**: Manage a centralized catalog of skills used across the organization.
+- **Job Role Builder**: Create jobs with specific skill requirements and assign **Weights** (importance) to each skill.
+- **Linked Candidates**: Candidates are linked directly to job roles, ensuring a clean recruitment pipeline.
 
-### Bước 1: Cấu hình Biến môi trường
-Truy cập vào Supabase Dashboard (Settings > API) để lấy các giá trị sau và điền vào file `.env`:
-```env
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-```
+### 2. Algorithmic Intelligence
+- **Weighted Match Score**: Backend Edge Functions calculate a candidate's fit based on the job's specific skill weights.
+- **AI Recommendations**: Get a quick list of top-performing candidates for any specific role using the `recommend` Edge Function.
+- **Parallel CV Upload**: Support for uploading multiple resumes simultaneously with an optimized concurrency limit (3) to prevent UI freezing.
 
-### Bước 2: Cài đặt thư viện và chạy Frontend
-```bash
-npm install
-npm run dev
-```
-Ứng dụng sẽ chạy tại `http://localhost:5173`.
+### 3. Modern UI/UX
+- **Real-time Synchronization**: Database changes (new candidates, status updates) reflect instantly across all connected clients.
+- **Interactive Analytics**: Dedicated dashboard with charts and statistics showing recruitment performance.
+- **Premium Aesthetics**: Glassmorphism design system using Tailwind 4, Framer Motion animations, and custom UI components (Dropdowns, Toasts, Skeletons).
 
-## 3. Quản lý Backend (Deploy lên Supabase Cloud)
+---
 
-### Bước 1: Đăng nhập CLI
-```bash
-supabase login
-```
+## 🏗️ Database Architecture (Supabase)
 
-### Bước 2: Liên kết với Project của bạn
-```bash
-supabase link --project-ref your-project-ref-id
-```
+The project uses a relational schema with Row Level Security (RLS) to ensure data privacy:
 
-### Bước 3: Đồng bộ Database Schema
-```bash
-supabase db push
-```
+- **`skills`**: Global list of skill names.
+- **`jobs`**: Contains `title`, `description`, and a `skills` JSONB field (array of `{skill_name, weight}`).
+- **`candidates`**: Links to `jobs` and stores candidate `full_name`, `skills` (JSONB), `resume_url`, and the calculated `match_score`.
 
-### Bước 4: Triển khai Edge Functions
-> [!IMPORTANT]
-> Phải sử dụng cờ `--no-verify-jwt` để bypass gateway xác thực và cho phép hàm tự xử lý Token thủ công qua `getUser()`.
+---
 
-```bash
-npx supabase functions deploy analytics --no-verify-jwt
-npx supabase functions deploy add-candidate --no-verify-jwt
-```
+## 🛠️ Getting Started
 
-## 4. Các chức năng chính & Thuật toán nâng cao
-- **Auth**: Hệ thống đăng nhập/đăng ký bảo mật với Supabase Auth.
-- **Dashboard Premium**: Giao diện hiện đại sử dụng Glassmorphism, Tailwind CSS 4 và Framer Motion.
-- **Smart Search/Sort (Algorithmic Thinking 3.1)**: Thuật toán tính điểm matching score để sắp xếp ứng viên phù hợp nhất với từ khóa tìm kiếm lên đầu.
-- **Realtime Updates**: Tự động cập nhật danh sách ứng viên và số liệu thống kê ngay lập tức khi có thay đổi từ DB.
-- **Edge Functions Analytics (Algorithmic Thinking 3.2)**: Xử lý tính toán tỷ lệ, số lượng ứng viên mới trong 7 ngày và vị trí top tuyển dụng trực tiếp tại serverless function.
-- **Storage**: Quản lý CV ứng viên chuyên nghiệp với Supabase Storage.
+### Prerequisites
+- Node.js (v18+)
+- Supabase CLI (`npx supabase`)
+
+### Installation
+1. **Clone & Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Environment Setup**:
+   Create a `.env` file in the root and add your Supabase credentials:
+   ```env
+   VITE_SUPABASE_URL=your_project_url
+   VITE_SUPABASE_ANON_KEY=your_anon_key
+   ```
+
+3. **Database Migration**:
+   Push the schema and migrations to your Supabase project:
+   ```bash
+   npx supabase db push
+   ```
+
+4. **Deploy Edge Functions**:
+   ```bash
+   npx supabase functions deploy add-candidate --no-verify-jwt
+   npx supabase functions deploy recommend --no-verify-jwt
+   npx supabase functions deploy analytics --no-verify-jwt
+   ```
+
+5. **Run Locally**:
+   ```bash
+   npm run dev
+   ```
+
+---
+
+## 📁 Project Structure
+- `/src/components`: UI modules (Job/Skill management, Candidate views).
+- `/src/pages`: Auth and Dashboard layouts.
+- `/supabase/functions`: Deno-based Edge Functions for heavy logic and security.
+- `/supabase/migrations`: SQL scripts for versioned schema updates.
+
+---
+*Created with ❤️ for Advanced HR Management.*
