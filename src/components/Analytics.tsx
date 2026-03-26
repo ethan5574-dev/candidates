@@ -30,10 +30,10 @@ export const Analytics: React.FC = () => {
         error.message?.includes('Unauthorized') ||
         (error.context && error.context.status === 401);
 
-      // if (isUnauthorized) {
-      //   await supabase.auth.signOut();
-      //   window.location.href = '/auth';
-      // }
+      if (isUnauthorized) {
+        await supabase.auth.signOut();
+        window.location.href = '/auth';
+      }
     } finally {
       setLoading(false);
     }

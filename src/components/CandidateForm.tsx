@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { motion } from 'framer-motion';
 
 export const CandidateForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -64,9 +65,13 @@ export const CandidateForm: React.FC = () => {
   };
 
   return (
-    <div className="glass-card p-8 rounded-[32px] border border-white/5 space-y-6">
+    <motion.div 
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="glass-card p-8 rounded-[32px] border border-white/5 space-y-6"
+    >
       <div className="space-y-4">
-        <div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 px-1">Full Name</label>
           <input
             type="text"
@@ -76,8 +81,8 @@ export const CandidateForm: React.FC = () => {
             onChange={(e) => setFullName(e.target.value)}
             placeholder="e.g. David Chen"
           />
-        </div>
-        <div>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 px-1">Applied Position</label>
           <input
             type="text"
@@ -87,8 +92,8 @@ export const CandidateForm: React.FC = () => {
             onChange={(e) => setPosition(e.target.value)}
             placeholder="e.g. Senior Frontend Engineer"
           />
-        </div>
-        <div>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
           <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 px-1">Upload Resume (PDF/Image)</label>
           <div className="relative group cursor-pointer">
             <input
@@ -107,9 +112,11 @@ export const CandidateForm: React.FC = () => {
               </p>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
-      <button
+      <motion.button
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
         onClick={handleSubmit}
         disabled={loading}
         className="btn-primary w-full py-4 rounded-2xl text-white font-bold text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50"
@@ -123,7 +130,7 @@ export const CandidateForm: React.FC = () => {
             Processing...
           </span>
         ) : 'Submit Profile'}
-      </button>
-    </div>
+      </motion.button>
+    </motion.div>
   );
 };

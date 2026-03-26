@@ -41,12 +41,18 @@ supabase db push
 ```
 
 ### Bước 4: Triển khai Edge Functions
+> [!IMPORTANT]
+> Phải sử dụng cờ `--no-verify-jwt` để bypass gateway xác thực và cho phép hàm tự xử lý Token thủ công qua `getUser()`.
+
 ```bash
-supabase functions deploy analytics
-supabase functions deploy add-candidate
+npx supabase functions deploy analytics --no-verify-jwt
+npx supabase functions deploy add-candidate --no-verify-jwt
 ```
 
-## 4. Các chức năng chính
-- **Auth**: Đăng nhập/Đăng ký.
-- **Dashboard**: Quản lý danh sách ứng viên, upload CV.
-- **Analytics**: Thống kê số lượng và tỷ lệ ứng viên tham qua Edge Functions.
+## 4. Các chức năng chính & Thuật toán nâng cao
+- **Auth**: Hệ thống đăng nhập/đăng ký bảo mật với Supabase Auth.
+- **Dashboard Premium**: Giao diện hiện đại sử dụng Glassmorphism, Tailwind CSS 4 và Framer Motion.
+- **Smart Search/Sort (Algorithmic Thinking 3.1)**: Thuật toán tính điểm matching score để sắp xếp ứng viên phù hợp nhất với từ khóa tìm kiếm lên đầu.
+- **Realtime Updates**: Tự động cập nhật danh sách ứng viên và số liệu thống kê ngay lập tức khi có thay đổi từ DB.
+- **Edge Functions Analytics (Algorithmic Thinking 3.2)**: Xử lý tính toán tỷ lệ, số lượng ứng viên mới trong 7 ngày và vị trí top tuyển dụng trực tiếp tại serverless function.
+- **Storage**: Quản lý CV ứng viên chuyên nghiệp với Supabase Storage.

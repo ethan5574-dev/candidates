@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { motion } from 'framer-motion';
 
 export const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -45,15 +46,20 @@ export const Auth: React.FC = () => {
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary opacity-20 blur-[120px] rounded-full animate-pulse"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary opacity-20 blur-[120px] rounded-full animate-pulse"></div>
 
-      <div className="glass max-w-md w-full space-y-8 p-10 rounded-[32px] animate-fade-in relative z-10 border border-white/10">
+      <motion.div 
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="glass max-w-md w-full space-y-8 p-10 rounded-[32px] relative z-10 border border-white/10"
+      >
         <div className="text-center">
-          {/* <div className="inline-flex items-center justify-center p-3 mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary shadow-lg shadow-primary/20">
+          <div className="inline-flex items-center justify-center p-3 mb-6 rounded-2xl bg-gradient-to-br from-primary to-secondary shadow-lg shadow-primary/20">
             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A10.003 10.003 0 0112 3a10.003 10.003 0 0112 10.003 10.003 0 01-10 10.003c-1.396 0-2.733-.242-3.987-.69m10.003-10.003l-.054.09" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-          </div> */}
+          </div>
           <h2 className="text-4xl font-extrabold tracking-tight text-white mb-2">
-            {isSignUp ? 'Join naming.' : 'Welcome back.'}
+            {isSignUp ? 'Join TalentPulse.' : 'Welcome back.'}
           </h2>
           <p className="text-text-secondary text-sm font-medium">
             {isSignUp ? 'Start managing your candidates with ease.' : 'Access your HR recruitment dashboard.'}
@@ -108,7 +114,7 @@ export const Auth: React.FC = () => {
             {isSignUp ? 'Already have an account? Sign In' : 'New to HR Portal? Create one'}
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
