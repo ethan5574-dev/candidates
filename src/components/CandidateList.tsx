@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import type { Candidate } from '../types';
-import { Search, MoreHorizontal, Star, Download, Trash2, Briefcase } from 'lucide-react';
+import { Search, MoreHorizontal, Download, Trash2, Briefcase, Sparkles, Filter } from 'lucide-react';
+import type { Candidate, Job } from '../types';
 import { motion } from 'framer-motion';
 import { Dropdown } from './common/Dropdown';
 import { useToast } from '../context/useToast';
@@ -10,19 +10,27 @@ export const CandidateList: React.FC = () => {
   const { showToast } = useToast();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [jobFilter, setJobFilter] = useState('');
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [recommendations, setRecommendations] = useState<Candidate[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 5;
 
   useEffect(() => {
     fetchCandidates();
+    fetchJobs();
     const subscription = supabase
       .channel('candidates_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
+        if (payload.eventType === 'INSERT' && payload.new) {
           setCandidates((prev) => [payload.new as Candidate, ...prev]);
-        } else if (payload.eventType === 'UPDATE') {
+        } else if (payload.eventType === 'UPDATE' && payload.new) {
           setCandidates((prev) => prev.map((c) => (c.id === payload.new.id ? { ...c, ...payload.new } as Candidate : c)));
-        } else if (payload.eventType === 'DELETE') {
+        } else if (payload.eventType === 'DELETE' && payload.old) {
           setCandidates((prev) => prev.filter((c) => c.id !== payload.old.id));
         }
       })
@@ -80,11 +88,33 @@ export const CandidateList: React.FC = () => {
     }
   };
 
-  const fetchCandidates = async () => {
+  const fetchCandidates = async (isLoadMore = false) => {
     try {
-      const { data, error } = await supabase.from('candidates').select('*').order('created_at', { ascending: false });
+      if (isLoadMore) setLoadingMore(true);
+      else setLoading(true);
+
+      let query = supabase
+        .from('candidates')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE);
+
+      if (isLoadMore && candidates.length > 0) {
+        const lastCandidate = candidates[candidates.length - 1];
+        query = query.lt('created_at', lastCandidate.created_at);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      setCandidates(data || []);
+
+      if (data) {
+        if (isLoadMore) {
+          setCandidates(prev => [...prev, ...data]);
+        } else {
+          setCandidates(data);
+        }
+        setHasMore(data.length === PAGE_SIZE);
+      }
     } catch (error: Error | unknown) {
       console.error('Error fetching candidates:', error);
       const err = error as { status?: number; message?: string };
@@ -97,13 +127,38 @@ export const CandidateList: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const fetchJobs = async () => {
+    const { data } = await supabase.from('jobs').select('*');
+    if (data) setJobs(data);
+  };
+
+  const getRecommendations = async () => {
+    if (!jobFilter) return;
+    setLoadingRecs(true);
+    try {
+      // Note: supabase.functions.invoke doesn't support query params directly in the first arg easily
+      // Better to use a standard fetch if needed, or invoke doesn't mind extra params
+      const { data: recData, error: recError } = await supabase.functions.invoke(`recommend?job_id=${jobFilter}`);
+      if (recError) throw recError;
+      setRecommendations(recData || []);
+      showToast('AI Recommendations loaded!', 'success');
+    } catch (error) {
+      console.error('Error getting recommendations:', error);
+      showToast('Failed to get recommendations', 'error');
+    } finally {
+      setLoadingRecs(false);
     }
   };
 
   const filteredCandidates = useMemo(() => {
     let result = candidates.filter(c => {
       const matchesStatus = statusFilter === 'All' || c.status === statusFilter;
-      return matchesStatus;
+      const matchesJob = !jobFilter || c.job_id === jobFilter;
+      return matchesStatus && matchesJob;
     });
 
     if (searchTerm.trim()) {
@@ -111,8 +166,8 @@ export const CandidateList: React.FC = () => {
       // Implementation of "Matching Score" algorithm for Smart Sort
       result = (result as (Candidate & { score: number })[]).map(c => {
         let score = 0;
-        const nameChars = c.full_name.toLowerCase();
-        const posChars = c.applied_position.toLowerCase();
+        const nameChars = (c.full_name || '').toLowerCase();
+        const posChars = (c.applied_position || '').toLowerCase();
 
         // Exact match starts with (high priority)
         if (nameChars.startsWith(term)) score += 100;
@@ -170,17 +225,78 @@ export const CandidateList: React.FC = () => {
           </button>
         </div>
 
-        <div className="relative group min-w-[280px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary group-focus-within:text-primary transition-colors" />
-          <input 
-            type="text" 
-            placeholder="Search candidates..." 
-            className="w-full pl-12 pr-4 py-2.5 bg-white/5 border border-white/5 rounded-xl text-sm focus:outline-none focus:bg-white/10 transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="relative min-w-[200px]">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+            <select 
+              className="w-full pl-12 pr-10 py-2.5 bg-white/5 border border-white/5 rounded-xl text-sm focus:outline-none focus:bg-white/10 appearance-none text-white"
+              value={jobFilter}
+              onChange={(e) => setJobFilter(e.target.value)}
+            >
+              <option value="">All Positions</option>
+              {jobs.map(job => (
+                <option key={job.id} value={job.id} className="bg-gray-900">{job.title}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative group min-w-[280px]">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary group-focus-within:text-primary transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Search candidates..." 
+              className="w-full pl-12 pr-4 py-2.5 bg-white/5 border border-white/5 rounded-xl text-sm focus:outline-none focus:bg-white/10 transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {jobFilter && (
+            <button
+              onClick={getRecommendations}
+              disabled={loadingRecs}
+              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-accent to-primary rounded-xl text-white text-xs font-bold hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <Sparkles className={`w-4 h-4 ${loadingRecs ? 'animate-pulse' : ''}`} />
+              {loadingRecs ? 'Analyzing...' : '⚡ AI Recommend Top 3'}
+            </button>
+          )}
         </div>
       </div>
+
+      {recommendations.length > 0 && jobFilter && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card p-6 border border-primary/20 bg-primary/5 rounded-[32px] space-y-4"
+        >
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-bold flex items-center gap-2 text-primary">
+              <Sparkles className="w-4 h-4" />
+              Top 3 AI Recommendations
+            </h4>
+            <button 
+              onClick={() => setRecommendations([])}
+              className="text-[10px] font-bold text-text-secondary hover:text-white uppercase tracking-widest"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {recommendations.map((c) => (
+              <div key={c.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                  {c.match_score}%
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white">{c.full_name}</p>
+                  <p className="text-[10px] text-text-secondary">{c.applied_position}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       <div className="glass-card rounded-[32px] border border-white/5">
         <table className="w-full text-left border-separate border-spacing-0">
@@ -188,7 +304,7 @@ export const CandidateList: React.FC = () => {
             <tr className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
               <th className="px-8 py-5 rounded-tl-[31px]">Candidate Name</th>
               <th className="px-6 py-5">Role Applied</th>
-              <th className="px-6 py-5">Rating</th>
+              <th className="px-6 py-5">Match Score</th>
               <th className="px-6 py-5">Status</th>
               <th className="px-8 py-5 text-right rounded-tr-[31px]">Action</th>
             </tr>
@@ -220,10 +336,16 @@ export const CandidateList: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-6 py-5">
-                  <div className="flex items-center gap-0.5 text-yellow-500">
-                    {[...Array(5)].map((_, idx) => (
-                      <Star key={idx} className={`w-3 h-3 ${idx < 4 ? 'fill-current' : 'text-white/10'}`} />
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <div className="w-12 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          (c.match_score || 0) > 70 ? 'bg-green-400' : (c.match_score || 0) > 40 ? 'bg-yellow-400' : 'bg-red-400'
+                        }`}
+                        style={{ width: `${c.match_score || 0}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-[10px] font-bold text-white/50">{c.match_score || 0}%</span>
                   </div>
                 </td>
                 <td className="px-6 py-5">
@@ -272,6 +394,18 @@ export const CandidateList: React.FC = () => {
           </div>
         )}
       </div>
+
+      {hasMore && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => fetchCandidates(true)}
+            disabled={loadingMore}
+            className="px-8 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all text-text-secondary hover:text-white disabled:opacity-50"
+          >
+            {loadingMore ? 'Loading...' : 'Load More Candidates'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

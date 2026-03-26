@@ -3,9 +3,18 @@ export interface Candidate {
   user_id: string;
   full_name: string;
   applied_position: string;
-  status: 'New' | 'Interviewing' | 'Hired' | 'Rejected';
+  status: string;
   resume_path?: string;
   created_at: string;
+  skills?: string[];
+  job_id?: string;
+  match_score?: number;
+}
+
+export interface Job {
+  id: string;
+  title: string;
+  description?: string;
 }
 
 export interface AnalyticsStats {

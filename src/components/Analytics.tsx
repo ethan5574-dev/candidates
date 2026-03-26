@@ -14,12 +14,19 @@ export const Analytics: React.FC = () => {
     try {
       const { data, error } = await supabase.functions.invoke('analytics');
       if (error) throw error;
+      
+      // Explicitly check for error in the data payload (from Edge Function)
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
       setStats(data);
     } catch (error: Error | unknown) {
       console.error('Error fetching analytics:', error);
       const err = error as { status?: number; message?: string };
       const isUnauthorized = err.status === 401 ||
-        err.message?.includes('Unauthorized');
+        err.message?.includes('Unauthorized') ||
+        err.message?.includes('JWT');
 
       if (isUnauthorized) {
         await supabase.auth.signOut();
@@ -47,14 +54,16 @@ export const Analytics: React.FC = () => {
     </div>
   );
 
-  if (!stats) return null;
+  if (!stats || !stats.topPositions || !stats.statusRatios || !stats.weeklyActivity || !stats.recentCandidates) {
+    return null;
+  }
 
-  const activeRolesCount = stats.topPositions.length;
+  const activeRolesCount = stats.topPositions?.length || 0;
 
   const metricCards = [
-    { label: 'Total Applications', value: stats.totalCandidates, icon: Users, color: 'text-primary', bg: 'bg-primary/10', trend: '+12%' },
-    { label: 'Recent (7 Days)', value: stats.recentCandidates.length, icon: UserCheck, color: 'text-secondary', bg: 'bg-secondary/10', trend: 'Live' },
-    { label: 'Interviews', value: stats.statusRatios['Interviewing'] || 0, icon: Calendar, color: 'text-accent', bg: 'bg-accent/10', trend: '0%' },
+    { label: 'Total Applications', value: stats.totalCandidates || 0, icon: Users, color: 'text-primary', bg: 'bg-primary/10', trend: '+12%' },
+    { label: 'Recent (7 Days)', value: stats.recentCandidates?.length || 0, icon: UserCheck, color: 'text-secondary', bg: 'bg-secondary/10', trend: 'Live' },
+    { label: 'Interviews', value: stats.statusRatios?.['Interviewing'] || 0, icon: Calendar, color: 'text-accent', bg: 'bg-accent/10', trend: '0%' },
     { label: 'Active Roles', value: activeRolesCount, icon: Briefcase, color: 'text-green-400', bg: 'bg-green-400/10', trend: 'Real' },
   ];
 
@@ -155,9 +164,6 @@ export const Analytics: React.FC = () => {
               <p className="text-[10px] text-text-secondary text-center py-10">No recent applications</p>
             )}
           </div>
-          <button className="mt-8 w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all">
-            See all candidates
-          </button>
         </div>
       </div>
 

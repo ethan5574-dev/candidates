@@ -6,12 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
 }
 
-interface CandidateRequest {
-  full_name: string;
-  applied_position: string;
-  resume_path?: string;
-}
-
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -32,7 +26,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const { full_name, applied_position, resume_path, skills, job_id } = await req.json()
+    const url = new URL(req.url)
+    const job_id = url.searchParams.get('job_id')
+
+    if (!job_id) {
+       return new Response(JSON.stringify({ error: 'job_id is required' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
 
     // Get user id from token
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
@@ -43,49 +45,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       })
     }
 
-    // Basic validation
-    if (!full_name || !applied_position) {
-      throw new Error('Full name and applied position are required.')
-    }
-
-    // 1. Calculate matching score if job_id is provided
-    let match_score = 0;
-    const candidateSkills = Array.isArray(skills) ? skills : [];
-
-    if (job_id) {
-      const { data: requirements, error: reqError } = await supabaseClient
-        .from('job_requirements')
-        .select('skill')
-        .eq('job_id', job_id);
-      
-      if (!reqError && requirements && requirements.length > 0) {
-        const requiredSkills = requirements.map(r => r.skill.toLowerCase());
-        const matchedSkills = candidateSkills.filter(s => 
-          requiredSkills.includes(s.toLowerCase())
-        );
-        match_score = (matchedSkills.length / requiredSkills.length) * 100;
-      }
-    }
-
-    // 2. Insert candidate
-    const { data, error } = await supabaseClient
+    // Fetch top 3 candidates by match_score for this job
+    const { data: candidates, error } = await supabaseClient
       .from('candidates')
-      .insert({
-        user_id: user.id,
-        full_name,
-        applied_position,
-        resume_path,
-        status: 'New',
-        skills: candidateSkills,
-        job_id,
-        match_score: Math.round(match_score)
-      })
-      .select()
-      .single()
+      .select('*')
+      .eq('job_id', job_id)
+      .order('match_score', { ascending: false })
+      .limit(3);
 
-    if (error) throw error
+    if (error) throw error;
 
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(candidates), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

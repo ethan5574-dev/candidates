@@ -2,9 +2,10 @@ import { CandidateList } from '../components/CandidateList'
 import { CandidateForm } from '../components/CandidateForm'
 import { Analytics } from '../components/Analytics'
 import type { Session } from '@supabase/supabase-js'
-import { Users, Settings, Bell, Search } from 'lucide-react'
+import { Users, Settings, PieChart } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { UserMenu } from '../components/common/UserMenu'
 
 interface DashboardPageProps {
@@ -16,6 +17,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
 
   const navItems = [
     { id: 'candidates', label: 'Candidate Management', icon: Users },
+    { id: 'analytics', label: 'Real-time Analytics', icon: PieChart },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -37,25 +39,18 @@ export function DashboardPage({ session }: DashboardPageProps) {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-semibold transition-all group ${activeTab === item.id
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-semibold transition-all group overflow-hidden ${activeTab === item.id
                   ? 'bg-primary/10 text-primary border border-primary/20'
                   : 'text-text-secondary hover:text-white hover:bg-white/5'
                 }`}
+              title={item.label}
             >
-              <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'text-primary' : 'group-hover:text-white'}`} />
-              {item.label}
+              <item.icon className={`w-5 h-5 flex-shrink-0 ${activeTab === item.id ? 'text-primary' : 'group-hover:text-white'}`} />
+              <span className="truncate whitespace-nowrap">{item.label}</span>
             </button>
           ))}
         </nav>
 
-        <div className="p-8 border-t border-white/5 mt-auto">
-          <div className="bg-gradient-to-br from-primary/20 to-secondary/20 rounded-3xl p-6 border border-white/5 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-12 translate-x-12 blur-2xl group-hover:bg-primary/20 transition-all duration-500"></div>
-            <p className="text-sm font-bold text-white relative z-10">Premium Plan</p>
-            <p className="text-[10px] text-text-secondary mt-1 relative z-10">Unlock advanced AI sorting & analytics</p>
-            <button className="mt-4 w-full py-2.5 bg-white text-black rounded-xl text-xs font-bold hover:bg-primary hover:text-white transition-all relative z-10">Upgrade Now</button>
-          </div>
-        </div>
       </aside>
 
       {/* Main Content */}
@@ -65,23 +60,9 @@ export function DashboardPage({ session }: DashboardPageProps) {
         <div className="fixed bottom-[-20%] left-[20%] w-[60%] h-[60%] bg-secondary opacity-5 blur-[150px] rounded-full -z-10 pointer-events-none"></div>
 
         {/* Top Header */}
-        <header className="sticky top-0 z-10 glass-card px-8 py-4 border-b border-white/5 flex items-center justify-between">
-          <div className="flex-1 max-w-xl relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary group-focus-within:text-primary transition-colors" />
-            <input
-              type="text"
-              placeholder="Search Candidates, Analytics..."
-              className="w-full pl-12 pr-4 py-2.5 bg-white/5 border border-white/5 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-primary/40 focus:bg-white/10 transition-all"
-            />
-          </div>
-
+        <header className="sticky top-0 z-10 glass-card px-8 py-4 border-b border-white/5 flex items-center justify-end">
           <div className="flex items-center gap-6">
-            <button className="relative p-2 rounded-xl border border-white/5 hover:bg-white/5 transition-all text-white/70 hover:text-white">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0d0f19]"></span>
-            </button>
-
-            <div className="pl-4 border-l border-white/10">
+            <div className="pl-4">
               <UserMenu email={session.user.email || 'HR Admin'} />
             </div>
           </div>
@@ -99,31 +80,67 @@ export function DashboardPage({ session }: DashboardPageProps) {
             </div>
           </motion.div>
 
-          {/* Render Active Tab */}
           <div className="space-y-10">
-            {activeTab === 'candidates' ? (
-              <>
-                <Analytics />
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                  <div className="lg:col-span-1 space-y-6">
-                    <h3 className="text-xl font-bold flex items-center gap-3">
-                      <span className="w-1 h-6 bg-secondary rounded-full"></span>
-                      Quick Add
-                    </h3>
-                    <CandidateForm />
-                  </div>
-                  <div className="lg:col-span-2 space-y-6">
-                    <h3 className="text-xl font-bold flex items-center gap-3">
-                      <span className="w-1 h-6 bg-accent rounded-full"></span>
-                      Candidate List
-                    </h3>
-                    <CandidateList />
-                  </div>
+            {activeTab === 'candidates' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                <div className="lg:col-span-1 space-y-6">
+                  <h3 className="text-xl font-bold flex items-center gap-3">
+                    <span className="w-1 h-6 bg-secondary rounded-full"></span>
+                    Quick Add
+                  </h3>
+                  <CandidateForm />
                 </div>
-              </>
-            ) : (
-              <div className="glass-card p-20 rounded-[32px] text-center">
+                <div className="lg:col-span-2 space-y-6">
+                  <h3 className="text-xl font-bold flex items-center gap-3">
+                    <span className="w-1 h-6 bg-accent rounded-full"></span>
+                    Candidate List
+                  </h3>
+                  <CandidateList />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'analytics' && (
+              <Analytics />
+            )}
+
+            {(activeTab !== 'candidates' && activeTab !== 'analytics') && (
+              <div className="glass-card p-20 rounded-[32px] text-center space-y-6">
                 <p className="text-text-secondary font-bold text-xl uppercase tracking-widest opacity-20">{activeTab} Section coming soon</p>
+                {activeTab === 'settings' && (
+                  <div className="pt-10 border-t border-white/5">
+                    <h4 className="text-sm font-bold text-white mb-4">Developer Tools</h4>
+                    <button 
+                      onClick={async () => {
+                        const { data: job, error: jobError } = await supabase
+                          .from('jobs')
+                          .insert({
+                            user_id: session.user.id,
+                            title: 'Senior React Developer',
+                            description: 'Requires expertise in React, TypeScript, and Tailwind.'
+                          })
+                          .select()
+                          .single();
+                        
+                        if (jobError) return alert('Failed to seed job');
+
+                        const requirements = ['React', 'TypeScript', 'Tailwind', 'Node.js'];
+                        await supabase
+                          .from('job_requirements')
+                          .insert(requirements.map(skill => ({
+                            job_id: job.id,
+                            skill
+                          })));
+                        
+                        alert('Seeded "Senior React Developer" job successfully!');
+                        window.location.reload();
+                      }}
+                      className="px-6 py-3 bg-white/5 hover:bg-primary/20 hover:text-primary rounded-xl text-xs font-bold transition-all border border-white/10"
+                    >
+                      Seed "Senior React Developer" Job for Testing
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
